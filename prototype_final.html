@@ -1,0 +1,2298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RideIQ — Live Driving Behavior Score</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0d0f14;
+    --surface:    #13161e;
+    --surface2:   #1a1e29;
+    --surface3:   #212639;
+    --border:     rgba(255,255,255,0.07);
+    --border2:    rgba(255,255,255,0.12);
+    --text:       #eef0f5;
+    --text2:      #8b91a8;
+    --text3:      #555d78;
+    --green:      #00e87a;
+    --green-dk:   #00a855;
+    --green-glow: rgba(0,232,122,0.18);
+    --amber:      #ffb930;
+    --amber-lt:   rgba(255,185,48,0.12);
+    --red:        #ff4757;
+    --red-lt:     rgba(255,71,87,0.12);
+    --blue:       #4a9eff;
+    --blue-lt:    rgba(74,158,255,0.12);
+    --purple:     #b57bff;
+    --radius:     14px;
+    --radius-sm:  8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 280px 1fr 260px;
+    grid-template-rows: 56px 1fr 156px;
+  }
+
+  /* ── Day mode overrides ── */
+  body.day {
+    --bg:         #f0f2f5;
+    --surface:    #ffffff;
+    --surface2:   #f7f8fa;
+    --surface3:   #edf0f4;
+    --border:     rgba(0,0,0,0.08);
+    --border2:    rgba(0,0,0,0.14);
+    --text:       #1a1e27;
+    --text2:      #5a6170;
+    --text3:      #9aa0ad;
+    --green:      #18a854;
+    --green-dk:   #0e6e36;
+    --green-glow: rgba(24,168,84,0.12);
+    --amber:      #d97706;
+    --amber-lt:   rgba(217,119,6,0.10);
+    --red:        #e03535;
+    --red-lt:     rgba(224,53,53,0.10);
+    --purple:     #7c3aed;
+    --radius:     14px;
+    --radius-sm:  8px;
+  }
+  body.day .logo-mark { box-shadow: 0 0 14px rgba(24,168,84,0.25); }
+  body.day .live-dot  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  body.day .metric-bar { box-shadow: none; }
+  body.day .metric-bar-wrap { background: rgba(0,0,0,0.07); }
+  body.day .param-bar-bg { background: rgba(0,0,0,0.07); }
+  body.day .log-entry { border-bottom-color: rgba(0,0,0,0.06); }
+  body.day .score-ring svg { filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12)); }
+  body.day header::after { opacity: 0.25; }
+  body.day .ride-timer { background: rgba(255,255,255,0.75); color: var(--text3); border-color: var(--border); }
+  body.day .btn-run    { box-shadow: 0 4px 16px rgba(24,168,84,0.3); }
+  body.day .btn-run.stop { box-shadow: 0 4px 16px rgba(224,53,53,0.25); }
+  body.day .hbadge-dim { background: rgba(0,0,0,0.04); }
+  body.day .viz        { background: #dfe4ea; }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px 5px 7px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    font-family: 'Space Grotesk', sans-serif;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .theme-toggle:hover { border-color: var(--green); color: var(--text); }
+
+  /* The pill track */
+  .toggle-track {
+    width: 32px; height: 18px;
+    border-radius: 10px;
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    position: relative;
+    transition: background 0.3s, border-color 0.3s;
+    flex-shrink: 0;
+  }
+  body.day .toggle-track { background: #d0d6df; }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--text3);
+    transition: transform 0.25s cubic-bezier(.4,0,.2,1), background 0.25s;
+  }
+  body.day .toggle-thumb {
+    transform: translateX(14px);
+    background: var(--green);
+  }
+  .toggle-icon { font-size: 13px; line-height: 1; }
+
+  /* ── Noise texture overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.4;
+  }
+
+  /* ── Header ── */
+  header {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    position: relative;
+    z-index: 10;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    opacity: 0.4;
+  }
+
+  .logo-mark {
+    width: 30px; height: 30px;
+    background: var(--green);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--bg);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    box-shadow: 0 0 14px rgba(0,232,122,0.35);
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: var(--text);
+  }
+  .logo span { color: var(--green); }
+  .sub {
+    color: var(--text3);
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 2px;
+    letter-spacing: 0.3px;
+  }
+
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .hbadge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .hbadge-green {
+    background: var(--green-glow);
+    color: var(--green);
+    border: 1px solid rgba(0,232,122,0.3);
+  }
+  .hbadge-dim {
+    background: rgba(255,255,255,0.04);
+    color: var(--text3);
+    border: 1px solid var(--border);
+  }
+
+  /* live dot */
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
+    50% { opacity: 0.5; box-shadow: 0 0 3px var(--green); }
+  }
+
+  /* ── Left panel ── */
+  .controls {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 16px 14px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .controls::-webkit-scrollbar { display: none; }
+
+  .panel-title {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .scenario-btn {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .scenario-btn:hover {
+    border-color: rgba(0,232,122,0.3);
+    background: var(--surface3);
+    color: var(--text);
+    transform: translateX(2px);
+  }
+  .scenario-btn.active {
+    border-color: rgba(0,232,122,0.4);
+    background: rgba(0,232,122,0.06);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px rgba(0,232,122,0.1);
+  }
+  .scenario-btn .icon { font-size: 16px; width: 22px; text-align: center; flex-shrink: 0; }
+  .sname { font-weight: 600; font-size: 12px; line-height: 1.2; }
+  .meta { font-size: 10px; color: var(--text3); margin-top: 2px; line-height: 1.3; }
+  .scenario-btn.active .meta { color: rgba(0,232,122,0.6); }
+  .scenario-btn.active .sname { color: var(--green); }
+
+  /* Sliders */
+  .slider-group { margin-bottom: 14px; }
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 7px;
+    font-weight: 500;
+  }
+  .slider-label span:last-child {
+    color: var(--green);
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
+  .slider-track {
+    position: relative;
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 4px;
+  }
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--green);
+    cursor: pointer;
+    height: 4px;
+    background: transparent;
+    -webkit-appearance: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0,232,122,0.5);
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 4px;
+  }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+  .btn-run {
+    width: 100%;
+    padding: 11px;
+    background: var(--green);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0,232,122,0.25);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-run::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transition: left 0.4s;
+  }
+  .btn-run:hover::before { left: 100%; }
+  .btn-run:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,232,122,0.35); }
+  .btn-run:active { transform: translateY(0); }
+  .btn-run.stop {
+    background: var(--red);
+    box-shadow: 0 4px 20px rgba(255,71,87,0.25);
+  }
+  .btn-run.stop:hover { box-shadow: 0 6px 24px rgba(255,71,87,0.35); }
+
+  /* ── Center Viz ── */
+  .viz {
+    position: relative;
+    overflow: hidden;
+    background: #0a0c10;
+  }
+  canvas#road { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* Score overlay */
+  .score-overlay {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .score-ring { position: relative; width: 148px; height: 148px; }
+  .score-ring svg {
+    width: 148px; height: 148px;
+    filter: drop-shadow(0 0 20px rgba(0,232,122,0.2));
+  }
+  .score-number {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 42px;
+    font-weight: 700;
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--green);
+    line-height: 1;
+    letter-spacing: 1px;
+  }
+  .score-label {
+    font-size: 8px;
+    color: var(--text3);
+    margin-top: 4px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .score-grade {
+    font-size: 14px;
+    font-weight: 700;
+    margin-top: 6px;
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px currentColor;
+  }
+
+  /* Ride time badge */
+  .ride-timer {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+  }
+
+  /* Event flash */
+  .event-flash {
+    position: absolute;
+    top: 46%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    padding: 8px 20px;
+    border-radius: 30px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+    backdrop-filter: blur(6px);
+    z-index: 3;
+  }
+  .event-flash.show { opacity: 1; }
+
+  /* ── Right panel ── */
+  .data-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 16px 14px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scrollbar-width: none;
+  }
+  .data-panel::-webkit-scrollbar { display: none; }
+
+  .metric-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    transition: border-color 0.2s;
+  }
+  .metric-card:hover { border-color: var(--border2); }
+  .metric-name {
+    font-size: 8px;
+    color: var(--text3);
+    margin-bottom: 3px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .metric-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .metric-val {
+    font-size: 26px;
+    font-weight: 700;
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--text);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .unit { font-size: 10px; color: var(--text3); font-weight: 500; font-family: 'Space Grotesk', sans-serif; }
+  .metric-bar-wrap {
+    margin-top: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    height: 3px;
+    overflow: hidden;
+  }
+  .metric-bar {
+    height: 3px;
+    border-radius: 4px;
+    transition: width 0.3s, background 0.3s;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  /* Score breakdown */
+  .score-breakdown-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px 0;
+    overflow: hidden;
+  }
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .param-row:last-child { border-bottom: none; }
+  .param-row:hover { background: var(--surface3); }
+  .param-name { color: var(--text2); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .param-weight { color: var(--text3); font-size: 9px; }
+  .param-score {
+    font-weight: 700;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    min-width: 30px;
+    text-align: right;
+  }
+  .param-bar-bg {
+    width: 50px;
+    height: 2px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-left: 8px;
+  }
+  .param-bar-fill {
+    height: 2px;
+    border-radius: 2px;
+    transition: width 0.3s, background 0.3s;
+  }
+
+  /* ── Bottom Waveform ── */
+  .waveform-panel {
+    grid-column: 1 / -1;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr auto 200px;
+    gap: 10px;
+    align-items: center;
+  }
+  .wave-label {
+    font-size: 8px;
+    color: var(--text3);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  canvas.wave { height: 128px; border-radius: var(--radius-sm); }
+
+  /* Event log */
+  .event-log-wrap {
+    height: 128px;
+    display: flex;
+    flex-direction: column;
+  }
+  .event-log-title {
+    font-size: 8px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+  .event-log {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 10px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  .event-log::-webkit-scrollbar { display: none; }
+  .log-entry {
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    animation: logIn 0.2s ease;
+  }
+  @keyframes logIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { color: var(--text3); min-width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+  .log-evt { font-weight: 600; font-size: 10px; }
+  .log-evt.brake  { color: var(--red); }
+  .log-evt.corner { color: var(--amber); }
+  .log-evt.accel  { color: #ff9f43; }
+  .log-evt.speed  { color: var(--purple); }
+  .log-evt.good   { color: var(--green); }
+  .log-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .log-dot.brake  { background: var(--red); }
+  .log-dot.corner { background: var(--amber); }
+  .log-dot.accel  { background: #ff9f43; }
+  .log-dot.speed  { background: var(--purple); }
+  .log-dot.good   { background: var(--green); }
+
+  /* Scenario risk pill */
+  .risk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    float: right;
+    margin-top: 1px;
+  }
+  .risk-low  { background: rgba(0,232,122,0.12); color: var(--green); border: 1px solid rgba(0,232,122,0.25); }
+  .risk-med  { background: rgba(255,185,48,0.12); color: var(--amber); border: 1px solid rgba(255,185,48,0.25); }
+  .risk-high { background: rgba(255,71,87,0.12); color: var(--red); border: 1px solid rgba(255,71,87,0.25); }
+
+  /* PDF download button */
+  .btn-pdf {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    color: var(--text2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 6px;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+  }
+  .btn-pdf:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: rgba(74,158,255,0.06);
+  }
+  .btn-pdf:active { transform: scale(0.98); }
+  .btn-pdf svg { flex-shrink: 0; }
+
+  /* PDF toast notification */
+  .pdf-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    z-index: 999;
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1), opacity 0.3s;
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .pdf-toast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+</style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- PDF toast -->
+<div class="pdf-toast" id="pdf-toast">
+  <span id="pdf-toast-icon">📄</span>
+  <span id="pdf-toast-msg">Generating report…</span>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo-mark">RI</div>
+  <div class="logo">Ride<span>IQ</span></div>
+  <div class="sub">Two-Wheeler Behavior Analytics · Live Simulation</div>
+  <div class="header-right">
+    <div class="live-dot" id="live-dot" style="opacity:0.3"></div>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle day / night">
+      <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      <span class="toggle-icon" id="theme-icon">🌙</span>
+      <span id="theme-label">Night</span>
+    </button>
+    <div class="hbadge hbadge-green">PROTOTYPE</div>
+    <div class="hbadge hbadge-dim">Varroc Eureka · PS3</div>
+  </div>
+</header>
+
+<!-- Left Controls -->
+<div class="controls">
+  <div class="panel-title">Ride Scenarios</div>
+
+  <button class="scenario-btn active" id="s-normal" onclick="setScenario('normal')">
+    <span class="icon">🛵</span>
+    <div style="flex:1">
+      <div class="sname">Smooth City Ride</div>
+      <div class="meta">Gradual accel · Gentle braking</div>
+    </div>
+    <span class="risk-pill risk-low">Low</span>
+  </button>
+  <button class="scenario-btn" id="s-aggressive" onclick="setScenario('aggressive')">
+    <span class="icon">⚡</span>
+    <div style="flex:1">
+      <div class="sname">Aggressive Riding</div>
+      <div class="meta">Hard braking · Sharp corners</div>
+    </div>
+    <span class="risk-pill risk-high">High</span>
+  </button>
+  <button class="scenario-btn" id="s-highway" onclick="setScenario('highway')">
+    <span class="icon">🛣️</span>
+    <div style="flex:1">
+      <div class="sname">Highway Cruise</div>
+      <div class="meta">High speed · Minimal events</div>
+    </div>
+    <span class="risk-pill risk-med">Med</span>
+  </button>
+  <button class="scenario-btn" id="s-rain" onclick="setScenario('rain')">
+    <span class="icon">🌧️</span>
+    <div style="flex:1">
+      <div class="sname">Rain / Wet Road</div>
+      <div class="meta">Slippery surface · Slides</div>
+    </div>
+    <span class="risk-pill risk-high">High</span>
+  </button>
+  <button class="scenario-btn" id="s-delivery" onclick="setScenario('delivery')">
+    <span class="icon">📦</span>
+    <div style="flex:1">
+      <div class="sname">Delivery Rider</div>
+      <div class="meta">Frequent stops · Lane weaving</div>
+    </div>
+    <span class="risk-pill risk-med">Med</span>
+  </button>
+
+  <div class="divider"></div>
+  <div class="panel-title">Manual Override</div>
+
+  <div class="slider-group">
+    <div class="slider-label"><span>Speed</span><span id="lbl-speed">40 km/h</span></div>
+    <input type="range" min="0" max="120" value="40" id="sl-speed" oninput="manualControl()">
+  </div>
+  <div class="slider-group">
+    <div class="slider-label"><span>Accel Jerk</span><span id="lbl-jerk">0 m/s³</span></div>
+    <input type="range" min="-25" max="25" value="0" id="sl-jerk" oninput="manualControl()">
+  </div>
+  <div class="slider-group">
+    <div class="slider-label"><span>Lean Angle</span><span id="lbl-lean">0°</span></div>
+    <input type="range" min="-50" max="50" value="0" id="sl-lean" oninput="manualControl()">
+  </div>
+
+  <button class="btn-run" id="btn-main" onclick="toggleRun()">▶ Start Simulation</button>
+
+  <button class="btn-pdf" onclick="downloadReport()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Download Report (PDF)
+  </button>
+</div>
+
+<!-- Center Viz -->
+<div class="viz">
+  <canvas id="road"></canvas>
+  <div class="score-overlay">
+    <div class="score-ring">
+      <svg viewBox="0 0 148 148">
+        <!-- BG ring -->
+        <circle cx="74" cy="74" r="62" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+        <!-- Track -->
+        <circle cx="74" cy="74" r="62" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="8"
+          stroke-dasharray="390" stroke-dashoffset="0" transform="rotate(-90 74 74)"/>
+        <!-- Score arc -->
+        <circle id="score-arc" cx="74" cy="74" r="62" fill="none" stroke="#00e87a"
+          stroke-width="8" stroke-linecap="round"
+          stroke-dasharray="390" stroke-dashoffset="0"
+          transform="rotate(-90 74 74)"
+          style="transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease; filter: drop-shadow(0 0 6px #00e87a)"/>
+        <!-- Inner fill -->
+        <circle cx="74" cy="74" r="56" fill="rgba(13,15,20,0.88)"/>
+      </svg>
+      <div class="score-number" id="score-display">100</div>
+    </div>
+    <div class="score-label">Behavior Score</div>
+    <div class="score-grade" id="score-grade" style="color:var(--green)">EXCELLENT</div>
+  </div>
+
+  <div class="event-flash" id="evt-flash"></div>
+
+  <div class="ride-timer" id="ride-timer">00:00</div>
+</div>
+
+<!-- Right: Sensor Data -->
+<div class="data-panel">
+  <div class="panel-title">Live Sensors</div>
+
+  <div class="metric-card">
+    <div class="metric-name">Speed · GPS</div>
+    <div class="metric-row">
+      <div class="metric-val" id="d-speed">40</div>
+      <span class="unit">km/h</span>
+    </div>
+    <div class="metric-bar-wrap"><div class="metric-bar" id="bar-speed" style="width:33%;background:var(--green)"></div></div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-name">Jerk · dA/dt</div>
+    <div class="metric-row">
+      <div class="metric-val" id="d-jerk">0.0</div>
+      <span class="unit">m/s³</span>
+    </div>
+    <div class="metric-bar-wrap"><div class="metric-bar" id="bar-jerk" style="width:50%;background:var(--green)"></div></div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-name">Lean Angle · θ</div>
+    <div class="metric-row">
+      <div class="metric-val" id="d-lean">0</div>
+      <span class="unit">°</span>
+    </div>
+    <div class="metric-bar-wrap"><div class="metric-bar" id="bar-lean" style="width:50%;background:var(--green)"></div></div>
+  </div>
+
+  <div class="divider" style="margin:2px 0"></div>
+  <div class="panel-title">Score Breakdown</div>
+
+  <div class="score-breakdown-card">
+    <div class="param-row">
+      <span class="param-name">
+        Braking
+        <span class="param-weight">25%</span>
+        <div class="param-bar-bg"><div class="param-bar-fill" id="pb-brake" style="width:100%;background:var(--green)"></div></div>
+      </span>
+      <span class="param-score" id="ps-brake" style="color:var(--green)">25</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">
+        Acceleration
+        <span class="param-weight">20%</span>
+        <div class="param-bar-bg"><div class="param-bar-fill" id="pb-accel" style="width:100%;background:var(--green)"></div></div>
+      </span>
+      <span class="param-score" id="ps-accel" style="color:var(--green)">20</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">
+        Cornering
+        <span class="param-weight">25%</span>
+        <div class="param-bar-bg"><div class="param-bar-fill" id="pb-corner" style="width:100%;background:var(--green)"></div></div>
+      </span>
+      <span class="param-score" id="ps-corner" style="color:var(--green)">25</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">
+        Speed
+        <span class="param-weight">20%</span>
+        <div class="param-bar-bg"><div class="param-bar-fill" id="pb-speed" style="width:100%;background:var(--green)"></div></div>
+      </span>
+      <span class="param-score" id="ps-speed" style="color:var(--green)">20</span>
+    </div>
+    <div class="param-row">
+      <span class="param-name">
+        Stability
+        <span class="param-weight">10%</span>
+        <div class="param-bar-bg"><div class="param-bar-fill" id="pb-stab" style="width:100%;background:var(--green)"></div></div>
+      </span>
+      <span class="param-score" id="ps-stab" style="color:var(--green)">10</span>
+    </div>
+  </div>
+
+  <div style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-align:center;padding:2px 0">
+    Score = 100 − Σ(penaltyᵢ × wᵢ)
+  </div>
+</div>
+
+<!-- Bottom: Waveforms + Log -->
+<div class="waveform-panel">
+  <div class="wave-label">Jerk Waveform</div>
+  <canvas class="wave" id="wave-jerk"></canvas>
+  <div class="wave-label">Score Trend</div>
+  <canvas class="wave" id="wave-score"></canvas>
+  <div class="wave-label" style="writing-mode:initial;transform:none;letter-spacing:0;margin-right:0;font-size:0">.</div>
+  <div class="event-log-wrap">
+    <div class="event-log-title">Event Log</div>
+    <div class="event-log" id="event-log"></div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+let running = false;
+let tick = 0;
+let score = 100;
+let scenario = 'normal';
+let isManual = false;
+
+let speed = 40, jerk = 0, lean = 0;
+let penalties = { brake: 25, accel: 20, corner: 25, speed: 20, stab: 10 };
+let jerkHistory = Array(300).fill(0);
+let scoreHistory = Array(300).fill(100);
+let rideTime = 0;
+let roadOffset = 0;
+let leanAnim = 0;
+
+// ─── Report tracking state ────────────────────────────────────────────────────
+let eventLogData = [];          // full structured event log
+let peakSpeed = 0;
+let minScore = 100;
+let maxJerk = 0;
+let maxLean = 0;
+let scoreSum = 0;
+let scoreSamples = 0;
+let eventCounts = { brake: 0, accel: 0, corner: 0, speed: 0, good: 0 };
+
+const SCENARIOS = {
+  normal:     { speed: [30,50],  jerkBurst: 0.04, leanBurst: 0.05, speedLimit: 60  },
+  aggressive: { speed: [50,90],  jerkBurst: 0.25, leanBurst: 0.25, speedLimit: 50  },
+  highway:    { speed: [80,100], jerkBurst: 0.03, leanBurst: 0.02, speedLimit: 100 },
+  rain:       { speed: [20,45],  jerkBurst: 0.18, leanBurst: 0.12, speedLimit: 40  },
+  delivery:   { speed: [20,60],  jerkBurst: 0.15, leanBurst: 0.18, speedLimit: 50  },
+};
+
+// ─── Canvas setup ────────────────────────────────────────────────────────────
+const roadCanvas = document.getElementById('road');
+const ctx = roadCanvas.getContext('2d');
+const waveJerkCanvas = document.getElementById('wave-jerk');
+const wjCtx = waveJerkCanvas.getContext('2d');
+const waveScoreCanvas = document.getElementById('wave-score');
+const wsCtx = waveScoreCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const viz = document.querySelector('.viz');
+  roadCanvas.width  = viz.clientWidth;
+  roadCanvas.height = viz.clientHeight;
+  waveJerkCanvas.width  = waveJerkCanvas.clientWidth;
+  waveJerkCanvas.height = 128;
+  waveScoreCanvas.width = waveScoreCanvas.clientWidth;
+  waveScoreCanvas.height = 128;
+}
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+
+// ─── Theme state ─────────────────────────────────────────────────────────────
+let isDay = false;
+
+function toggleTheme() {
+  isDay = !isDay;
+  document.body.classList.toggle('day', isDay);
+  document.getElementById('theme-icon').textContent  = isDay ? '☀️' : '🌙';
+  document.getElementById('theme-label').textContent = isDay ? 'Day'  : 'Night';
+  // Update score ring inner fill to match theme
+  document.querySelector('#score-arc').closest('svg').querySelector('circle:last-child')
+    .setAttribute('fill', isDay ? 'rgba(255,255,255,0.90)' : 'rgba(13,15,20,0.88)');
+  if (!running) { drawRoad(); drawWaves(); }
+}
+
+// ─── Road drawing (day / night) ───────────────────────────────────────────────
+function drawRoad() {
+  if (isDay) { drawRoadDay(); return; }
+  drawRoadNight();
+}
+
+function drawRoadNight() {
+  const W = roadCanvas.width, H = roadCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Night sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, H * 0.52);
+  sky.addColorStop(0,   '#060810');
+  sky.addColorStop(0.5, '#0a0d1a');
+  sky.addColorStop(1,   '#0f1220');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H * 0.52);
+
+  // Stars
+  const starSeed = Math.floor(roadOffset * 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  for (let i = 0; i < 60; i++) {
+    const sx = ((i * 137.5 + starSeed) % W);
+    const sy = ((i * 93.7) % (H * 0.42));
+    const sz = 0.6 + (i % 3) * 0.5;
+    const flicker = 0.4 + 0.6 * Math.abs(Math.sin(i + rideTime * 0.8));
+    ctx.globalAlpha = flicker * 0.7;
+    ctx.beginPath(); ctx.arc(sx, sy, sz, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Distant city glow
+  const cityGlow = ctx.createLinearGradient(0, H*0.35, 0, H*0.52);
+  cityGlow.addColorStop(0, 'rgba(0,232,122,0.04)');
+  cityGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = cityGlow;
+  ctx.fillRect(0, H*0.35, W, H*0.17);
+
+  // Distant city silhouette
+  const buildingColors = ['#0f1520', '#111822', '#0d1318'];
+  for (let bx = 0; bx < W; bx += 22) {
+    const bh = 20 + Math.sin(bx * 0.15 + 1) * 12;
+    const bc = buildingColors[Math.floor(bx / 22) % buildingColors.length];
+    ctx.fillStyle = bc;
+    ctx.fillRect(bx, H * 0.52 - bh, 20, bh);
+    // Windows
+    if (Math.sin(bx * 0.3) > 0.3) {
+      ctx.fillStyle = 'rgba(255,220,100,0.4)';
+      for (let wy = 0; wy < bh - 4; wy += 5) {
+        if (Math.random() > 0.4) ctx.fillRect(bx + 3, H*0.52 - bh + wy + 2, 3, 3);
+      }
+    }
+  }
+
+  // Road surface — dark asphalt
+  const roadGrad = ctx.createLinearGradient(0, H * 0.52, 0, H);
+  roadGrad.addColorStop(0,   '#0f1218');
+  roadGrad.addColorStop(0.3, '#121620');
+  roadGrad.addColorStop(1,   '#181c28');
+  ctx.fillStyle = roadGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, H * 0.52); ctx.lineTo(W, H * 0.52); ctx.lineTo(W, H); ctx.lineTo(0, H);
+  ctx.fill();
+
+  // Horizon glow
+  const hGlow = ctx.createLinearGradient(0, H*0.50, 0, H*0.55);
+  hGlow.addColorStop(0, 'rgba(0,232,122,0.06)');
+  hGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = hGlow;
+  ctx.fillRect(0, H*0.50, W, H*0.05);
+
+  // Horizon line
+  ctx.strokeStyle = 'rgba(0,232,122,0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H * 0.52); ctx.lineTo(W, H * 0.52); ctx.stroke();
+
+  // Road edges — subtle reflection
+  const leftShade = ctx.createLinearGradient(0, 0, W * 0.12, 0);
+  leftShade.addColorStop(0, 'rgba(0,0,0,0.4)');
+  leftShade.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = leftShade;
+  ctx.fillRect(0, H * 0.52, W * 0.12, H);
+  const rightShade = ctx.createLinearGradient(W, 0, W * 0.88, 0);
+  rightShade.addColorStop(0, 'rgba(0,0,0,0.4)');
+  rightShade.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rightShade;
+  ctx.fillRect(W * 0.88, H * 0.52, W * 0.12, H);
+
+  const cxR = W / 2;
+  const vpY = H * 0.52;
+
+  // Lane dashes — neon white with glow
+  for (let lane = -1; lane <= 1; lane++) {
+    if (lane === 0) continue;
+    for (let d = 0; d < 14; d++) {
+      const t1 = (d / 14 + roadOffset) % 1;
+      const t2 = ((d + 0.38) / 14 + roadOffset) % 1;
+      const y1 = vpY + (H - vpY) * Math.pow(t1, 0.6);
+      const y2 = vpY + (H - vpY) * Math.pow(t2, 0.6);
+      const x1 = cxR + lane * (W * 0.10) * Math.pow(t1, 0.6);
+      const x2 = cxR + lane * (W * 0.10) * Math.pow(t2, 0.6);
+      const alpha = 0.5 + 0.5 * Math.pow(t1, 0.4);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.7})`;
+      ctx.lineWidth = Math.max(1, 2.5 * Math.pow(t1, 0.4));
+      ctx.shadowColor = 'rgba(255,255,255,0.3)';
+      ctx.shadowBlur = 3;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  // Outer edge lines (amber/yellow)
+  for (let side of [-1, 1]) {
+    ctx.strokeStyle = 'rgba(255,185,48,0.5)';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(255,185,48,0.3)';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.moveTo(cxR + side * W * 0.22, vpY);
+    ctx.lineTo(cxR + side * W * 0.48, H);
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+
+  // Streetlight effect
+  for (let side of [-1, 1]) {
+    for (let d = 0; d < 5; d++) {
+      const t = ((d / 5 + roadOffset * 0.5)) % 1;
+      const pY = vpY + (H - vpY) * Math.pow(t, 0.5);
+      const pX = cxR + side * (W * 0.35) * Math.pow(t, 0.55);
+      const alpha = 0.3 * Math.pow(t, 0.3);
+      const coneGrad = ctx.createRadialGradient(pX, pY, 0, pX, pY, 60 * Math.pow(t, 0.5));
+      coneGrad.addColorStop(0, `rgba(255,230,160,${alpha * 0.5})`);
+      coneGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = coneGrad;
+      ctx.beginPath(); ctx.arc(pX, pY, 60 * Math.pow(t, 0.5), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Bike silhouette (night / neon)
+  const bX = cxR + leanAnim * 28;
+  const bY = H * 0.73;
+  const leanRad = leanAnim * 0.35;
+  ctx.save();
+  ctx.translate(bX, bY);
+  ctx.rotate(leanRad);
+
+  // Shadow under bike
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(0, 24, 60, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Road glow under bike
+  const bikeGlow = ctx.createRadialGradient(0, 15, 0, 0, 15, 70);
+  bikeGlow.addColorStop(0, 'rgba(0,232,122,0.08)');
+  bikeGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = bikeGlow;
+  ctx.beginPath(); ctx.ellipse(0, 15, 70, 20, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Wheels
+  const wheelAngle = roadOffset * Math.PI * 8;
+  for (let wx of [-42, 42]) {
+    // Outer tire
+    ctx.fillStyle = '#1a1a1a';
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(wx, 16, 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // Rim glow
+    ctx.strokeStyle = 'rgba(0,232,122,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(0,232,122,0.5)';
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(wx, 16, 16, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    // Spokes
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+      const sa = a + wheelAngle;
+      ctx.strokeStyle = 'rgba(100,100,120,0.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(wx, 16);
+      ctx.lineTo(wx + Math.cos(sa) * 13, 16 + Math.sin(sa) * 13);
+      ctx.stroke();
+    }
+    // Hub
+    ctx.fillStyle = '#00e87a';
+    ctx.shadowColor = '#00e87a'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(wx, 16, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Body frame
+  ctx.fillStyle = '#0d1020';
+  ctx.strokeStyle = 'rgba(0,232,122,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = 'rgba(0,232,122,0.2)';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.roundRect(-44, -24, 88, 32, 7);
+  ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Body accent stripe
+  ctx.fillStyle = 'rgba(0,232,122,0.15)';
+  ctx.beginPath(); ctx.roundRect(-44, -24, 88, 8, [7,7,0,0]); ctx.fill();
+
+  // Neon underglow
+  const underGlow = ctx.createLinearGradient(-44, 8, 44, 8);
+  underGlow.addColorStop(0, 'transparent');
+  underGlow.addColorStop(0.5, 'rgba(0,232,122,0.35)');
+  underGlow.addColorStop(1, 'transparent');
+  ctx.strokeStyle = underGlow;
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00e87a'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.moveTo(-40, 10); ctx.lineTo(40, 10); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Handlebars
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(30, -24); ctx.lineTo(46, -32); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(46, -32); ctx.lineTo(52, -22); ctx.stroke();
+
+  // Rider body
+  ctx.fillStyle = '#0e1525';
+  ctx.strokeStyle = 'rgba(74,158,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-12, -52, 26, 34, 5); ctx.fill(); ctx.stroke();
+  // Jacket highlight
+  ctx.fillStyle = 'rgba(74,158,255,0.08)';
+  ctx.beginPath(); ctx.roundRect(-11, -52, 12, 18, 4); ctx.fill();
+
+  // Helmet
+  ctx.fillStyle = '#080c14';
+  ctx.strokeStyle = 'rgba(0,232,122,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(2, -58, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // Visor
+  ctx.fillStyle = 'rgba(0,232,122,0.5)';
+  ctx.globalAlpha = 0.6;
+  ctx.shadowColor = '#00e87a'; ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.ellipse(5, -57, 9, 5, 0, 0, Math.PI); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+
+  // Headlight beam
+  const ledColor = speed > 80 ? '#ff4757' : speed > 60 ? '#ffb930' : '#00e87a';
+  ctx.fillStyle = ledColor;
+  ctx.shadowColor = ledColor; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(50, -20, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Headlight cone
+  const headCone = ctx.createRadialGradient(50, -20, 0, 50, -20, 80);
+  headCone.addColorStop(0, `${ledColor}25`);
+  headCone.addColorStop(1, 'transparent');
+  ctx.fillStyle = headCone;
+  ctx.beginPath();
+  ctx.moveTo(50, -20);
+  ctx.lineTo(130, -80);
+  ctx.lineTo(130, 40);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ─── Road drawing — Day scene ─────────────────────────────────────────────────
+function drawRoadDay() {
+  const W = roadCanvas.width, H = roadCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Bright sky
+  const sky = ctx.createLinearGradient(0, 0, 0, H * 0.50);
+  sky.addColorStop(0,   '#5ba8e5');
+  sky.addColorStop(0.6, '#a8d4f5');
+  sky.addColorStop(1,   '#cce8f9');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, H * 0.50);
+
+  // Sun
+  const sunX = W * 0.82, sunY = H * 0.10;
+  const sunGrad = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 60);
+  sunGrad.addColorStop(0,   'rgba(255,250,200,0.9)');
+  sunGrad.addColorStop(0.3, 'rgba(255,220,80,0.5)');
+  sunGrad.addColorStop(1,   'transparent');
+  ctx.fillStyle = sunGrad;
+  ctx.beginPath(); ctx.arc(sunX, sunY, 60, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fffde7';
+  ctx.beginPath(); ctx.arc(sunX, sunY, 14, 0, Math.PI*2); ctx.fill();
+
+  // Clouds
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  const cloudSeed = roadOffset * 60;
+  [[W*0.15 - cloudSeed%W, H*0.10, 58,22],
+   [W*0.50 - (cloudSeed*0.7)%W, H*0.07, 72,26],
+   [W*0.78 - (cloudSeed*0.5)%W, H*0.16, 46,18]].forEach(([cx,cy,rw,rh]) => {
+    ctx.beginPath(); ctx.ellipse(cx, cy, rw, rh, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx-rw*0.35, cy+rh*0.2, rw*0.6, rh*0.7, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+rw*0.35, cy+rh*0.1, rw*0.5, rh*0.65, 0, 0, Math.PI*2); ctx.fill();
+  });
+
+  // Treeline
+  const treeY = H*0.46;
+  for (let tx = 0; tx < W; tx += 26) {
+    const th = 18 + Math.sin(tx*0.3 + roadOffset*10) * 8;
+    ctx.fillStyle = '#4a9e5c';
+    ctx.beginPath(); ctx.arc(tx, treeY - th/2, 12, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#3d8a4e';
+    ctx.beginPath(); ctx.arc(tx, treeY - th/2 + 5, 9, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Road surface — warm asphalt
+  const roadGrad = ctx.createLinearGradient(0, H*0.50, 0, H);
+  roadGrad.addColorStop(0,   '#b0b7c3');
+  roadGrad.addColorStop(0.3, '#c2c8d2');
+  roadGrad.addColorStop(1,   '#d0d5de');
+  ctx.fillStyle = roadGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, H*0.50); ctx.lineTo(W, H*0.50); ctx.lineTo(W, H); ctx.lineTo(0, H);
+  ctx.fill();
+
+  // Horizon
+  ctx.strokeStyle = '#98a0b0'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(0, H*0.50); ctx.lineTo(W, H*0.50); ctx.stroke();
+
+  // Road edge shading
+  const ls = ctx.createLinearGradient(0, 0, W*0.14, 0);
+  ls.addColorStop(0, 'rgba(0,0,0,0.09)'); ls.addColorStop(1, 'transparent');
+  ctx.fillStyle = ls; ctx.fillRect(0, H*0.50, W*0.14, H);
+  const rs = ctx.createLinearGradient(W, 0, W*0.86, 0);
+  rs.addColorStop(0, 'rgba(0,0,0,0.09)'); rs.addColorStop(1, 'transparent');
+  ctx.fillStyle = rs; ctx.fillRect(W*0.86, H*0.50, W*0.14, H);
+
+  const cxR = W/2, vpY = H*0.50;
+
+  // Lane dashes
+  for (let lane = -1; lane <= 1; lane++) {
+    if (lane === 0) continue;
+    for (let d = 0; d < 12; d++) {
+      const t1 = (d/12 + roadOffset) % 1;
+      const t2 = ((d+0.4)/12 + roadOffset) % 1;
+      const y1 = vpY + (H-vpY)*Math.pow(t1,0.6);
+      const y2 = vpY + (H-vpY)*Math.pow(t2,0.6);
+      const x1 = cxR + lane*(W*0.10)*Math.pow(t1,0.6);
+      const x2 = cxR + lane*(W*0.10)*Math.pow(t2,0.6);
+      ctx.strokeStyle = `rgba(255,255,255,${0.7 + 0.3*Math.pow(t1,0.3)})`;
+      ctx.lineWidth = Math.max(1.2, 2.6*Math.pow(t1,0.4));
+      ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    }
+  }
+
+  // Yellow outer edges
+  for (let side of [-1,1]) {
+    ctx.strokeStyle = '#f5c842'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(cxR + side*W*0.22, vpY);
+    ctx.lineTo(cxR + side*W*0.48, H);
+    ctx.stroke();
+  }
+
+  // Bike — daytime palette
+  const bX = cxR + leanAnim*28;
+  const bY = H*0.73;
+  ctx.save();
+  ctx.translate(bX, bY);
+  ctx.rotate(leanAnim*0.35);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.beginPath(); ctx.ellipse(6, 26, 58, 8, 0, 0, Math.PI*2); ctx.fill();
+
+  // Wheels
+  const wa = roadOffset*Math.PI*8;
+  for (let wx of [-42,42]) {
+    ctx.fillStyle = '#2a2a2a'; ctx.strokeStyle = '#111'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(wx,16,20,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(wx,16,17,0,Math.PI*2); ctx.stroke();
+    for (let a=0; a<Math.PI*2; a+=Math.PI/3) {
+      const sa=a+wa;
+      ctx.strokeStyle='#888'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(wx,16); ctx.lineTo(wx+Math.cos(sa)*14, 16+Math.sin(sa)*14); ctx.stroke();
+    }
+    ctx.fillStyle='#bbb';
+    ctx.beginPath(); ctx.arc(wx,16,4,0,Math.PI*2); ctx.fill();
+  }
+
+  // Body
+  ctx.fillStyle='#18a854'; ctx.strokeStyle='#0e6e36'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.roundRect(-44,-22,88,30,7); ctx.fill(); ctx.stroke();
+  // Highlight
+  const bodyHl = ctx.createLinearGradient(-44,-22,-44,-8);
+  bodyHl.addColorStop(0,'rgba(255,255,255,0.28)'); bodyHl.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=bodyHl; ctx.beginPath(); ctx.roundRect(-44,-22,88,14,[7,7,0,0]); ctx.fill();
+
+  // Handlebars
+  ctx.strokeStyle='#444'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(30,-22); ctx.lineTo(46,-30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(46,-30); ctx.lineTo(52,-20); ctx.stroke();
+
+  // Rider
+  ctx.fillStyle='#2563eb'; ctx.strokeStyle='rgba(37,99,235,0.5)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(-10,-52,24,32,4); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.2)';
+  ctx.beginPath(); ctx.roundRect(-9,-52,11,16,3); ctx.fill();
+
+  // Helmet
+  ctx.fillStyle='#1a1a2e'; ctx.strokeStyle='#333'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(2,-58,13,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='rgba(135,205,250,0.75)'; ctx.globalAlpha=0.8;
+  ctx.beginPath(); ctx.ellipse(5,-57,9,5,0,0,Math.PI); ctx.fill();
+  ctx.globalAlpha=1;
+
+  // Speed indicator LED
+  const ledC = speed>80?'#e03535':speed>60?'#e08c00':'#18a854';
+  ctx.fillStyle=ledC; ctx.shadowColor=ledC; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.arc(50,-20,4,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+
+  ctx.restore();
+}
+
+// ─── Waveform drawing — theme-aware ──────────────────────────────────────────
+function drawWaves() {
+  const surfBg  = isDay ? '#f7f8fa' : '#13161e';
+  const gridCol = isDay ? 'rgba(0,0,0,0.06)'   : 'rgba(255,255,255,0.04)';
+  const zeroCol = isDay ? 'rgba(0,0,0,0.12)'   : 'rgba(255,255,255,0.12)';
+  const lblCol  = isDay ? 'rgba(80,90,110,0.8)' : 'rgba(100,110,130,0.6)';
+
+  // Jerk wave
+  const jW = waveJerkCanvas.width, jH = 128;
+  wjCtx.fillStyle = surfBg;
+  wjCtx.fillRect(0, 0, jW, jH);
+
+  // Grid lines
+  wjCtx.strokeStyle = gridCol; wjCtx.lineWidth = 0.8;
+  for (let i = 0; i <= 4; i++) {
+    const y = jH * i / 4;
+    wjCtx.beginPath(); wjCtx.moveTo(0, y); wjCtx.lineTo(jW, y); wjCtx.stroke();
+  }
+
+  // Zero line
+  wjCtx.strokeStyle = zeroCol; wjCtx.lineWidth = 1;
+  wjCtx.beginPath(); wjCtx.moveTo(0, jH/2); wjCtx.lineTo(jW, jH/2); wjCtx.stroke();
+
+  // Threshold lines
+  wjCtx.strokeStyle = 'rgba(255,71,87,0.4)'; wjCtx.lineWidth = 1; wjCtx.setLineDash([4, 4]);
+  const th_brake = jH / 2 - (15 / 25) * (jH / 2) * 0.88;
+  wjCtx.beginPath(); wjCtx.moveTo(0, th_brake); wjCtx.lineTo(jW, th_brake); wjCtx.stroke();
+  wjCtx.strokeStyle = 'rgba(255,185,48,0.4)';
+  const th_accel = jH / 2 + (12 / 25) * (jH / 2) * 0.88;
+  wjCtx.beginPath(); wjCtx.moveTo(0, th_accel); wjCtx.lineTo(jW, th_accel); wjCtx.stroke();
+  wjCtx.setLineDash([]);
+
+  wjCtx.fillStyle = 'rgba(255,71,87,0.7)'; wjCtx.font = '8px JetBrains Mono';
+  wjCtx.fillText('−15', 4, th_brake - 3);
+  wjCtx.fillStyle = 'rgba(255,185,48,0.7)';
+  wjCtx.fillText('+12', 4, th_accel + 10);
+
+  // Area fill
+  const n = jerkHistory.length;
+  wjCtx.beginPath();
+  jerkHistory.forEach((v, i) => {
+    const x = (i / n) * jW;
+    const y = jH / 2 - (v / 25) * (jH / 2) * 0.88;
+    i === 0 ? wjCtx.moveTo(x, y) : wjCtx.lineTo(x, y);
+  });
+  wjCtx.lineTo(jW, jH/2); wjCtx.lineTo(0, jH/2); wjCtx.closePath();
+  wjCtx.fillStyle = 'rgba(0,232,122,0.06)'; wjCtx.fill();
+
+  // Jerk line
+  wjCtx.lineWidth = 1.8;
+  wjCtx.beginPath();
+  jerkHistory.forEach((v, i) => {
+    const x = (i / n) * jW;
+    const y = jH / 2 - (v / 25) * (jH / 2) * 0.88;
+    if (i === 0) { wjCtx.moveTo(x, y); return; }
+    const c = Math.abs(v) > 15 ? '#ff4757' : Math.abs(v) > 8 ? '#ffb930' : '#00e87a';
+    wjCtx.strokeStyle = c;
+    wjCtx.shadowColor = c; wjCtx.shadowBlur = 3;
+    wjCtx.lineTo(x, y); wjCtx.stroke();
+    wjCtx.beginPath(); wjCtx.moveTo(x, y);
+  });
+  wjCtx.shadowBlur = 0;
+
+  // Score wave
+  const sW = waveScoreCanvas.width, sH = 128;
+  wsCtx.fillStyle = surfBg;
+  wsCtx.fillRect(0, 0, sW, sH);
+
+  // Grid
+  wsCtx.strokeStyle = gridCol; wsCtx.lineWidth = 0.8;
+  [0, 25, 50, 75, 100].forEach(v => {
+    const y = sH - (v / 100) * sH * 0.90 - sH * 0.05;
+    wsCtx.beginPath(); wsCtx.moveTo(0, y); wsCtx.lineTo(sW, y); wsCtx.stroke();
+    wsCtx.fillStyle = lblCol;
+    wsCtx.font = '8px JetBrains Mono';
+    wsCtx.fillText(v, 3, y - 2);
+  });
+
+  // Score area
+  wsCtx.beginPath();
+  scoreHistory.forEach((v, i) => {
+    const x = (i / n) * sW;
+    const y = sH - (v / 100) * sH * 0.90 - sH * 0.05;
+    i === 0 ? wsCtx.moveTo(x, y) : wsCtx.lineTo(x, y);
+  });
+  wsCtx.lineTo(sW, sH); wsCtx.lineTo(0, sH); wsCtx.closePath();
+  wsCtx.fillStyle = 'rgba(0,232,122,0.07)'; wsCtx.fill();
+
+  // Score line
+  wsCtx.lineWidth = 2;
+  wsCtx.beginPath();
+  scoreHistory.forEach((v, i) => {
+    const x = (i / n) * sW;
+    const y = sH - (v / 100) * sH * 0.90 - sH * 0.05;
+    const c = v >= 80 ? '#00e87a' : v >= 60 ? '#ffb930' : '#ff4757';
+    if (i === 0) { wsCtx.moveTo(x, y); return; }
+    wsCtx.strokeStyle = c;
+    wsCtx.shadowColor = c; wsCtx.shadowBlur = 4;
+    wsCtx.lineTo(x, y); wsCtx.stroke();
+    wsCtx.beginPath(); wsCtx.moveTo(x, y);
+  });
+  wsCtx.shadowBlur = 0;
+}
+
+// ─── Score calculation ────────────────────────────────────────────────────────
+function calcScore() {
+  const cfg = SCENARIOS[scenario];
+  const brakePen  = jerk < -15 ? Math.min(25, 25 * (Math.abs(jerk) - 15) / 10) : 0;
+  const accelPen  = jerk > 12  ? Math.min(20, 20 * (jerk - 12) / 13) : 0;
+  const cornerPen = Math.abs(lean) > 35 ? Math.min(25, 25 * (Math.abs(lean) - 35) / 15) : 0;
+  const speedPen  = speed > cfg.speedLimit ? Math.min(20, 20 * (speed - cfg.speedLimit) / 30) : 0;
+  const stabJerk  = Math.abs(jerk);
+  const stabPen   = stabJerk > 5 ? Math.min(10, 10 * (stabJerk - 5) / 20) : 0;
+
+  penalties.brake  = Math.max(0, 25 - brakePen);
+  penalties.accel  = Math.max(0, 20 - accelPen);
+  penalties.corner = Math.max(0, 25 - cornerPen);
+  penalties.speed  = Math.max(0, 20 - speedPen);
+  penalties.stab   = Math.max(0, 10 - stabPen);
+
+  const raw = penalties.brake + penalties.accel + penalties.corner + penalties.speed + penalties.stab;
+  score = Math.max(0, Math.min(100, score * 0.85 + raw * 0.15));
+  return { brakePen, accelPen, cornerPen, speedPen };
+}
+
+// ─── Update UI ───────────────────────────────────────────────────────────────
+function updateUI(pens) {
+  const sc = score >= 80 ? '#00e87a' : score >= 60 ? '#ffb930' : '#ff4757';
+
+  // Score dial (circumference ~390)
+  const arc = 390 * (1 - score / 100);
+  const arcEl = document.getElementById('score-arc');
+  arcEl.style.strokeDashoffset = arc;
+  arcEl.style.stroke = sc;
+  arcEl.style.filter = `drop-shadow(0 0 ${isDay ? '4px' : '8px'} ${sc})`;
+
+  // Update inner circle fill dynamically
+  document.querySelector('.score-ring svg circle:last-of-type')
+    .setAttribute('fill', isDay ? 'rgba(255,255,255,0.92)' : 'rgba(13,15,20,0.88)');
+
+  document.getElementById('score-display').textContent = Math.round(score);
+  document.getElementById('score-display').style.color = sc;
+
+  const grade = score >= 90 ? 'EXCELLENT' : score >= 75 ? 'GOOD' : score >= 60 ? 'AVERAGE' : score >= 40 ? 'POOR' : 'DANGEROUS';
+  const gradeEl = document.getElementById('score-grade');
+  gradeEl.textContent = grade;
+  gradeEl.style.color = sc;
+  gradeEl.style.textShadow = isDay ? 'none' : `0 0 20px ${sc}`;
+
+  // Ride timer
+  const mins = Math.floor(rideTime / 60).toString().padStart(2, '0');
+  const secs = Math.floor(rideTime % 60).toString().padStart(2, '0');
+  document.getElementById('ride-timer').textContent = `${mins}:${secs}`;
+
+  // Sensor readings
+  document.getElementById('d-speed').textContent = Math.round(speed);
+  document.getElementById('d-jerk').textContent  = jerk.toFixed(1);
+  document.getElementById('d-lean').textContent  = Math.round(lean);
+
+  const barSpeed = document.getElementById('bar-speed');
+  barSpeed.style.width = (speed / 120 * 100) + '%';
+  barSpeed.style.background = speed > 80 ? '#ff4757' : '#00e87a';
+
+  const barJerk = document.getElementById('bar-jerk');
+  const jAbs = Math.min(Math.abs(jerk), 25);
+  barJerk.style.width = (jAbs / 25 * 100) + '%';
+  barJerk.style.background = jAbs > 15 ? '#ff4757' : jAbs > 8 ? '#ffb930' : '#00e87a';
+
+  const barLean = document.getElementById('bar-lean');
+  const lAbs = Math.min(Math.abs(lean), 50);
+  barLean.style.width = (lAbs / 50 * 100) + '%';
+  barLean.style.background = lAbs > 35 ? '#ff4757' : lAbs > 20 ? '#ffb930' : '#00e87a';
+
+  // Score breakdown with mini bars
+  const maxes = { brake: 25, accel: 20, corner: 25, speed: 20, stab: 10 };
+  const scoreColor = v => v > 15 ? '#00e87a' : v > 8 ? '#ffb930' : '#ff4757';
+  ['brake', 'accel', 'corner', 'speed', 'stab'].forEach(k => {
+    const el = document.getElementById('ps-' + k);
+    const pb = document.getElementById('pb-' + k);
+    const v  = penalties[k];
+    el.textContent  = v.toFixed(0);
+    const c = scoreColor(v);
+    el.style.color  = c;
+    pb.style.width  = (v / maxes[k] * 100) + '%';
+    pb.style.background = c;
+  });
+
+  // Event flash
+  const flash = document.getElementById('evt-flash');
+  if (pens.brakePen > 5) {
+    flash.textContent = '⚠ HARSH BRAKE';
+    flash.style.background = 'rgba(255,71,87,0.15)';
+    flash.style.color = '#ff4757';
+    flash.style.borderColor = 'rgba(255,71,87,0.4)';
+    flash.classList.add('show');
+  } else if (pens.cornerPen > 5) {
+    flash.textContent = '⚠ SHARP CORNER';
+    flash.style.background = 'rgba(255,185,48,0.15)';
+    flash.style.color = '#ffb930';
+    flash.style.borderColor = 'rgba(255,185,48,0.4)';
+    flash.classList.add('show');
+  } else if (pens.accelPen > 5) {
+    flash.textContent = '⚠ HARD ACCEL';
+    flash.style.background = 'rgba(255,159,67,0.15)';
+    flash.style.color = '#ff9f43';
+    flash.style.borderColor = 'rgba(255,159,67,0.4)';
+    flash.classList.add('show');
+  } else if (pens.speedPen > 5) {
+    flash.textContent = '⚠ OVER SPEED';
+    flash.style.background = 'rgba(181,123,255,0.15)';
+    flash.style.color = '#b57bff';
+    flash.style.borderColor = 'rgba(181,123,255,0.4)';
+    flash.classList.add('show');
+  } else {
+    flash.classList.remove('show');
+  }
+}
+
+// ─── Event log ───────────────────────────────────────────────────────────────
+let lastLogTime = 0;
+function logEvent(pens) {
+  // Track report stats every tick
+  if (speed > peakSpeed)       peakSpeed = speed;
+  if (score < minScore)        minScore  = score;
+  if (Math.abs(jerk) > maxJerk) maxJerk  = Math.abs(jerk);
+  if (Math.abs(lean) > maxLean) maxLean  = Math.abs(lean);
+  scoreSum += score; scoreSamples++;
+
+  if (rideTime - lastLogTime < 1.5) return;
+  const log = document.getElementById('event-log');
+  let type = null, cls = 'good', label = 'Smooth riding';
+  if (pens.brakePen > 5)       { type = 'brake';  cls = 'brake';  label = 'Harsh braking'; }
+  else if (pens.cornerPen > 5) { type = 'corner'; cls = 'corner'; label = 'Sharp corner';  }
+  else if (pens.accelPen > 5)  { type = 'accel';  cls = 'accel';  label = 'Hard accel';    }
+  else if (pens.speedPen > 5)  { type = 'speed';  cls = 'speed';  label = 'Speeding';      }
+  if (!type && Math.random() > 0.15) return;
+  lastLogTime = rideTime;
+
+  const t = `${Math.floor(rideTime / 60).toString().padStart(2,'0')}:${Math.floor(rideTime % 60).toString().padStart(2,'0')}`;
+
+  // Store in data log for PDF
+  eventLogData.push({
+    time: t, type: cls, label,
+    speed: Math.round(speed), score: Math.round(score),
+    jerk: jerk.toFixed(1), lean: Math.round(lean)
+  });
+  if (cls in eventCounts) eventCounts[cls]++;
+
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<div class="log-dot ${cls}"></div><span class="log-time">${t}</span><span class="log-evt ${cls}">${label}</span>`;
+  log.insertBefore(entry, log.firstChild);
+  if (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+// ─── Sim loop ────────────────────────────────────────────────────────────────
+let lastTs = null;
+function simLoop(ts) {
+  if (!running) return;
+  const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0.016;
+  lastTs = ts;
+  rideTime += dt;
+  tick++;
+
+  if (!isManual) {
+    const cfg = SCENARIOS[scenario];
+    const [sMin, sMax] = cfg.speed;
+    const targetSpeed = sMin + (sMax - sMin) * (0.5 + 0.5 * Math.sin(rideTime * 0.3));
+    speed += (targetSpeed - speed) * 0.05;
+
+    if (Math.random() < cfg.jerkBurst * dt * 3) {
+      jerk = (Math.random() - 0.5) * 40;
+    } else {
+      jerk += (-jerk * 4 + (Math.random() - 0.5) * 3) * dt;
+    }
+    jerk = Math.max(-25, Math.min(25, jerk));
+
+    if (Math.random() < cfg.leanBurst * dt * 2) {
+      lean = (Math.random() - 0.5) * 80;
+    } else {
+      lean += (-lean * 3 + (Math.random() - 0.5) * 5) * dt;
+    }
+    lean = Math.max(-50, Math.min(50, lean));
+  }
+
+  jerkHistory.push(jerk);
+  if (jerkHistory.length > 300) jerkHistory.shift();
+  const pens = calcScore();
+  scoreHistory.push(score);
+  if (scoreHistory.length > 300) scoreHistory.shift();
+
+  roadOffset = (roadOffset + speed / 300 * dt) % 1;
+  leanAnim += (lean / 50 - leanAnim) * 0.1;
+
+  updateUI(pens);
+  logEvent(pens);
+  drawRoad();
+  drawWaves();
+
+  requestAnimationFrame(simLoop);
+}
+
+// ─── Controls ────────────────────────────────────────────────────────────────
+function toggleRun() {
+  running = !running;
+  const btn = document.getElementById('btn-main');
+  const dot = document.getElementById('live-dot');
+  if (running) {
+    btn.textContent = '⏹  Stop Simulation';
+    btn.classList.add('stop');
+    dot.style.opacity = '1';
+    lastTs = null;
+    requestAnimationFrame(simLoop);
+  } else {
+    btn.textContent = '▶  Start Simulation';
+    btn.classList.remove('stop');
+    dot.style.opacity = '0.3';
+  }
+}
+
+function setScenario(s) {
+  scenario = s;
+  isManual = false;
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-' + s).classList.add('active');
+  score = 100;
+  penalties = { brake: 25, accel: 20, corner: 25, speed: 20, stab: 10 };
+  // Reset report tracking
+  eventLogData = []; peakSpeed = 0; minScore = 100; maxJerk = 0; maxLean = 0;
+  scoreSum = 0; scoreSamples = 0; eventCounts = { brake:0, accel:0, corner:0, speed:0, good:0 };
+  document.getElementById('event-log').innerHTML = '';
+}
+
+function manualControl() {
+  isManual = true;
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  speed = +document.getElementById('sl-speed').value;
+  jerk  = +document.getElementById('sl-jerk').value;
+  lean  = +document.getElementById('sl-lean').value;
+  document.getElementById('lbl-speed').textContent = Math.round(speed) + ' km/h';
+  document.getElementById('lbl-jerk').textContent  = jerk.toFixed(0) + ' m/s³';
+  document.getElementById('lbl-lean').textContent  = Math.round(lean) + '°';
+}
+
+// ─── Toast helper ────────────────────────────────────────────────────────────
+function showToast(icon, msg, duration = 2800) {
+  const t = document.getElementById('pdf-toast');
+  document.getElementById('pdf-toast-icon').textContent = icon;
+  document.getElementById('pdf-toast-msg').textContent  = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ─── PDF Report Generator ─────────────────────────────────────────────────────
+function downloadReport() {
+  if (!window.jspdf) { showToast('⚠️', 'PDF library not loaded yet, try again.'); return; }
+  if (scoreSamples === 0) { showToast('ℹ️', 'Run the simulation first to generate data.'); return; }
+
+  showToast('⏳', 'Generating report…', 4000);
+
+  setTimeout(() => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    const W = 210, H = 297;
+    const MARGIN = 16;
+    const COL = W - MARGIN * 2;
+    let y = 0;
+
+    // ── Colour palette ──────────────────────────────────────────────────────
+    const C = {
+      bg:       [13, 15, 20],
+      surface:  [19, 22, 30],
+      surface2: [26, 30, 41],
+      green:    [0, 200, 100],
+      amber:    [255, 185, 48],
+      red:      [255, 71, 87],
+      blue:     [74, 158, 255],
+      text:     [238, 240, 245],
+      text2:    [139, 145, 168],
+      text3:    [85, 93, 120],
+      white:    [255, 255, 255],
+    };
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const rgb  = (arr) => ({ r: arr[0], g: arr[1], b: arr[2] });
+    const setFill   = (arr) => doc.setFillColor(...arr);
+    const setStroke = (arr) => doc.setDrawColor(...arr);
+    const setTxt    = (arr) => doc.setTextColor(...arr);
+    const setFont   = (size, style='normal', face='helvetica') => {
+      doc.setFont(face, style);
+      doc.setFontSize(size);
+    };
+    const rect  = (x, rx, ry, rw, rh, r=0) => doc.roundedRect(rx, ry, rw, rh, r, r, 'F');
+    const line  = (x1, ly1, x2, ly2) => doc.line(x1, ly1, x2, ly2);
+
+    const scoreLabel = (s) => s >= 90 ? 'EXCELLENT' : s >= 75 ? 'GOOD' : s >= 60 ? 'AVERAGE' : s >= 40 ? 'POOR' : 'DANGEROUS';
+    const scoreColor = (s) => s >= 80 ? C.green : s >= 60 ? C.amber : C.red;
+    const eventColor = (cls) => ({ brake: C.red, corner: C.amber, accel: [255,159,67], speed: [181,123,255], good: C.green })[cls] || C.text2;
+
+    const SCENARIOS_META = {
+      normal:     { name: 'Smooth City Ride',   icon: '🛵', risk: 'LOW',    speedLimit: 60  },
+      aggressive: { name: 'Aggressive Riding',  icon: '⚡', risk: 'HIGH',   speedLimit: 50  },
+      highway:    { name: 'Highway Cruise',      icon: '🛣', risk: 'MEDIUM', speedLimit: 100 },
+      rain:       { name: 'Rain / Wet Road',     icon: '🌧', risk: 'HIGH',   speedLimit: 40  },
+      delivery:   { name: 'Delivery Rider',      icon: '📦', risk: 'MEDIUM', speedLimit: 50  },
+    };
+    const meta      = SCENARIOS_META[scenario] || SCENARIOS_META.normal;
+    const avgScore  = scoreSamples > 0 ? scoreSum / scoreSamples : 0;
+    const finalScore = Math.round(score);
+    const totalEvents = eventCounts.brake + eventCounts.accel + eventCounts.corner + eventCounts.speed;
+    const mins = Math.floor(rideTime / 60).toString().padStart(2,'0');
+    const secs = Math.floor(rideTime % 60).toString().padStart(2,'0');
+    const duration = `${mins}:${secs}`;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+    const timeStr = now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+
+    // ╔════════════════════════════════════════════════════════════════╗
+    // ║  PAGE 1                                                        ║
+    // ╚════════════════════════════════════════════════════════════════╝
+
+    // Full-page dark background
+    setFill(C.bg);
+    doc.rect(0, 0, W, H, 'F');
+
+    // ── Header bar ─────────────────────────────────────────────────────────
+    setFill(C.surface);
+    doc.rect(0, 0, W, 36, 'F');
+
+    // Header accent line
+    setFill(C.green);
+    doc.rect(0, 36, W, 0.8, 'F');
+
+    // Logo mark
+    setFill(C.green);
+    doc.roundedRect(MARGIN, 8, 14, 14, 2, 2, 'F');
+    setFont(9, 'bold');
+    setTxt(C.bg);
+    doc.text('RI', MARGIN + 7, 17, { align: 'center' });
+
+    // Logo text
+    setFont(16, 'bold');
+    setTxt(C.text);
+    doc.text('Ride', MARGIN + 17, 17.5);
+    setTxt(C.green);
+    doc.text('IQ', MARGIN + 33, 17.5);
+
+    // Sub-header
+    setFont(7, 'normal');
+    setTxt(C.text3);
+    doc.text('Two-Wheeler Driving Behavior Analytics', MARGIN + 17, 23);
+
+    // Date & badge on right
+    setFont(7, 'normal');
+    setTxt(C.text3);
+    doc.text(`${dateStr}  ${timeStr}`, W - MARGIN, 14, { align: 'right' });
+
+    // Prototype badge
+    setFill([0, 50, 25]);
+    doc.roundedRect(W - MARGIN - 28, 18, 28, 10, 2, 2, 'F');
+    setFont(6, 'bold');
+    setTxt(C.green);
+    doc.text('PROTOTYPE', W - MARGIN - 14, 24.5, { align: 'center' });
+
+    y = 44;
+
+    // ── Report title ────────────────────────────────────────────────────────
+    setFont(18, 'bold');
+    setTxt(C.text);
+    doc.text('Simulation Report', MARGIN, y + 8);
+
+    setFont(8, 'normal');
+    setTxt(C.text2);
+    doc.text(`Scenario · ${meta.name}`, MARGIN, y + 15);
+
+    // Risk pill
+    const riskCol = meta.risk === 'HIGH' ? C.red : meta.risk === 'MEDIUM' ? C.amber : C.green;
+    setFill(riskCol.map(v => Math.min(255, v * 0.15 + 10)));
+    doc.roundedRect(W - MARGIN - 22, y + 3, 22, 8, 2, 2, 'F');
+    setFont(6, 'bold');
+    setTxt(riskCol);
+    doc.text(`RISK: ${meta.risk}`, W - MARGIN - 11, y + 8.5, { align: 'center' });
+
+    y += 22;
+
+    // Divider
+    setFill(C.surface2);
+    doc.rect(MARGIN, y, COL, 0.5, 'F');
+    y += 6;
+
+    // ── Score hero card ─────────────────────────────────────────────────────
+    setFill(C.surface);
+    doc.roundedRect(MARGIN, y, COL, 34, 3, 3, 'F');
+
+    // Accent left bar
+    setFill(scoreColor(finalScore));
+    doc.roundedRect(MARGIN, y, 3, 34, 1.5, 1.5, 'F');
+
+    // Final score big number
+    setFont(28, 'bold');
+    setTxt(scoreColor(finalScore));
+    doc.text(`${finalScore}`, MARGIN + 14, y + 20);
+
+    setFont(8, 'normal');
+    setTxt(C.text3);
+    doc.text('/100', MARGIN + 14, y + 27);
+
+    // Grade label
+    setFont(11, 'bold');
+    setTxt(scoreColor(finalScore));
+    doc.text(scoreLabel(finalScore), MARGIN + 38, y + 16);
+
+    setFont(7, 'normal');
+    setTxt(C.text3);
+    doc.text('Final Behavior Score', MARGIN + 38, y + 23);
+
+    // Stats right side of hero
+    const heroStats = [
+      { label: 'Avg Score',    val: avgScore.toFixed(1) },
+      { label: 'Min Score',    val: minScore.toFixed(1) },
+      { label: 'Duration',     val: duration },
+      { label: 'Total Events', val: `${totalEvents}` },
+    ];
+    heroStats.forEach((s, i) => {
+      const sx = W - MARGIN - 100 + (i % 2) * 50;
+      const sy = y + 10 + Math.floor(i / 2) * 14;
+      setFont(13, 'bold');
+      setTxt(C.text);
+      doc.text(s.val, sx, sy);
+      setFont(6, 'normal');
+      setTxt(C.text3);
+      doc.text(s.label, sx, sy + 5);
+    });
+
+    y += 40;
+
+    // ── Metrics row (3 cards) ───────────────────────────────────────────────
+    const cardW = (COL - 8) / 3;
+    const metricsData = [
+      { label: 'Peak Speed',  val: `${Math.round(peakSpeed)}`, unit: 'km/h',  color: peakSpeed > 80 ? C.red : C.green },
+      { label: 'Max Jerk',    val: `${maxJerk.toFixed(1)}`,   unit: 'm/s³',  color: maxJerk > 15 ? C.red : maxJerk > 8 ? C.amber : C.green },
+      { label: 'Max Lean',    val: `${Math.round(maxLean)}`,  unit: 'deg',   color: maxLean > 35 ? C.red : maxLean > 20 ? C.amber : C.green },
+    ];
+    metricsData.forEach((m, i) => {
+      const mx = MARGIN + i * (cardW + 4);
+      setFill(C.surface);
+      doc.roundedRect(mx, y, cardW, 26, 2, 2, 'F');
+      // Top accent
+      setFill(m.color);
+      doc.roundedRect(mx, y, cardW, 1.5, 0.5, 0.5, 'F');
+      setFont(6, 'bold');
+      setTxt(C.text3);
+      doc.text(m.label.toUpperCase(), mx + 5, y + 8);
+      setFont(16, 'bold');
+      setTxt(m.color);
+      doc.text(m.val, mx + 5, y + 20);
+      setFont(7, 'normal');
+      setTxt(C.text3);
+      doc.text(m.unit, mx + 5 + doc.getTextWidth(m.val) + 2, y + 20);
+    });
+    y += 32;
+
+    // ── Score Breakdown ──────────────────────────────────────────────────────
+    setFont(9, 'bold');
+    setTxt(C.green);
+    doc.text('SCORE BREAKDOWN', MARGIN, y);
+    setFill(C.green);
+    doc.rect(MARGIN, y + 1.5, 28, 0.5, 'F');
+    y += 7;
+
+    const breakdown = [
+      { label: 'Braking',      max: 25, val: penalties.brake,  pct: 25 },
+      { label: 'Acceleration', max: 20, val: penalties.accel,  pct: 20 },
+      { label: 'Cornering',    max: 25, val: penalties.corner, pct: 25 },
+      { label: 'Speed',        max: 20, val: penalties.speed,  pct: 20 },
+      { label: 'Stability',    max: 10, val: penalties.stab,   pct: 10 },
+    ];
+
+    breakdown.forEach((b, i) => {
+      const bx = MARGIN, by = y + i * 12;
+      const barW = COL - 60;
+      const filled = (b.val / b.max) * barW;
+      const col = b.val / b.max >= 0.7 ? C.green : b.val / b.max >= 0.4 ? C.amber : C.red;
+
+      setFont(7, 'normal');
+      setTxt(C.text2);
+      doc.text(b.label, bx, by + 5);
+
+      setFont(6, 'normal');
+      setTxt(C.text3);
+      doc.text(`(${b.pct}%)`, bx + 26, by + 5);
+
+      // Bar bg
+      setFill(C.surface2);
+      doc.roundedRect(bx + 40, by + 1.5, barW, 4, 2, 2, 'F');
+      // Bar fill
+      if (filled > 0) {
+        setFill(col);
+        doc.roundedRect(bx + 40, by + 1.5, filled, 4, 2, 2, 'F');
+      }
+
+      // Score value
+      setFont(8, 'bold');
+      setTxt(col);
+      doc.text(`${b.val.toFixed(0)} / ${b.max}`, W - MARGIN, by + 5.5, { align: 'right' });
+    });
+    y += breakdown.length * 12 + 6;
+
+    // ── Event Summary grid ──────────────────────────────────────────────────
+    setFont(9, 'bold');
+    setTxt(C.green);
+    doc.text('EVENT SUMMARY', MARGIN, y);
+    setFill(C.green);
+    doc.rect(MARGIN, y + 1.5, 26, 0.5, 'F');
+    y += 7;
+
+    const evtTypes = [
+      { label: 'Harsh Braking',   count: eventCounts.brake,  col: C.red },
+      { label: 'Hard Accel',      count: eventCounts.accel,  col: [255,159,67] },
+      { label: 'Sharp Cornering', count: eventCounts.corner, col: C.amber },
+      { label: 'Speeding',        count: eventCounts.speed,  col: [181,123,255] },
+    ];
+    const evtCardW = (COL - 12) / 4;
+    evtTypes.forEach((e, i) => {
+      const ex = MARGIN + i * (evtCardW + 4);
+      setFill(C.surface);
+      doc.roundedRect(ex, y, evtCardW, 22, 2, 2, 'F');
+      setFill(e.col);
+      doc.roundedRect(ex, y, evtCardW, 1.5, 0.5, 0.5, 'F');
+      setFont(14, 'bold');
+      setTxt(e.col);
+      doc.text(`${e.count}`, ex + evtCardW / 2, y + 13, { align: 'center' });
+      setFont(5.5, 'normal');
+      setTxt(C.text3);
+      doc.text(e.label.toUpperCase(), ex + evtCardW / 2, y + 19, { align: 'center' });
+    });
+    y += 28;
+
+    // ── Scenario Info ──────────────────────────────────────────────────────
+    setFill(C.surface);
+    doc.roundedRect(MARGIN, y, COL, 22, 2, 2, 'F');
+    setFont(7, 'bold');
+    setTxt(C.text3);
+    doc.text('SCENARIO DETAILS', MARGIN + 5, y + 7);
+
+    const scenInfo = [
+      { label: 'Name',         val: meta.name },
+      { label: 'Risk Level',   val: meta.risk },
+      { label: 'Speed Limit',  val: `${meta.speedLimit} km/h` },
+      { label: 'Mode',         val: isManual ? 'Manual Override' : 'Auto Simulation' },
+    ];
+    scenInfo.forEach((s, i) => {
+      const sx = MARGIN + 5 + i * 46;
+      setFont(5.5, 'normal');
+      setTxt(C.text3);
+      doc.text(s.label, sx, y + 14);
+      setFont(6.5, 'bold');
+      setTxt(C.text);
+      doc.text(s.val, sx, y + 19);
+    });
+    y += 28;
+
+    // ── Score chart (sparkline) ─────────────────────────────────────────────
+    setFont(9, 'bold');
+    setTxt(C.green);
+    doc.text('SCORE TREND', MARGIN, y);
+    setFill(C.green);
+    doc.rect(MARGIN, y + 1.5, 20, 0.5, 'F');
+    y += 7;
+
+    const chartH = 28, chartW = COL;
+    setFill(C.surface);
+    doc.roundedRect(MARGIN, y, chartW, chartH, 2, 2, 'F');
+
+    // Grid lines at 25, 50, 75
+    [25, 50, 75].forEach(v => {
+      const gy = y + chartH - (v / 100) * chartH * 0.85 - chartH * 0.075;
+      doc.setDrawColor(...C.surface2);
+      doc.setLineWidth(0.3);
+      doc.line(MARGIN + 2, gy, MARGIN + chartW - 2, gy);
+      setFont(4.5, 'normal');
+      setTxt(C.text3);
+      doc.text(`${v}`, MARGIN + 3, gy - 0.5);
+    });
+
+    // Score line (sampled from scoreHistory)
+    const hist = scoreHistory.filter((_, i) => i % 3 === 0);
+    const n = hist.length;
+    if (n > 1) {
+      for (let i = 1; i < n; i++) {
+        const x1 = MARGIN + ((i-1)/(n-1)) * (chartW - 4) + 2;
+        const y1 = y + chartH - (hist[i-1]/100) * chartH * 0.85 - chartH * 0.075;
+        const x2 = MARGIN + (i/(n-1)) * (chartW - 4) + 2;
+        const y2 = y + chartH - (hist[i]/100) * chartH * 0.85 - chartH * 0.075;
+        const col = hist[i] >= 80 ? C.green : hist[i] >= 60 ? C.amber : C.red;
+        doc.setDrawColor(...col);
+        doc.setLineWidth(0.7);
+        doc.line(x1, y1, x2, y2);
+      }
+    }
+    y += chartH + 6;
+
+    // ── Footer page 1 ──────────────────────────────────────────────────────
+    setFill(C.surface);
+    doc.rect(0, H - 14, W, 14, 'F');
+    setFill(C.green);
+    doc.rect(0, H - 14, W, 0.5, 'F');
+    setFont(6, 'normal');
+    setTxt(C.text3);
+    doc.text('RideIQ · Two-Wheeler Driving Behavior Analytics · Varroc Eureka PS3', MARGIN, H - 5);
+    doc.text('Page 1 of 2', W - MARGIN, H - 5, { align: 'right' });
+
+    // ╔════════════════════════════════════════════════════════════════╗
+    // ║  PAGE 2 — Event Log                                           ║
+    // ╚════════════════════════════════════════════════════════════════╝
+    doc.addPage();
+
+    setFill(C.bg);
+    doc.rect(0, 0, W, H, 'F');
+
+    // Header
+    setFill(C.surface);
+    doc.rect(0, 0, W, 28, 'F');
+    setFill(C.green);
+    doc.rect(0, 28, W, 0.8, 'F');
+
+    setFont(7, 'bold');
+    setTxt(C.green);
+    doc.text('RIDEIQ', MARGIN, 12);
+    setFont(12, 'bold');
+    setTxt(C.text);
+    doc.text('Event Log Detail', MARGIN, 21);
+    setFont(7, 'normal');
+    setTxt(C.text3);
+    doc.text(`${meta.name} · ${dateStr} ${timeStr} · Duration ${duration}`, W - MARGIN, 21, { align: 'right' });
+
+    y = 36;
+
+    if (eventLogData.length === 0) {
+      setFont(10, 'normal');
+      setTxt(C.text3);
+      doc.text('No events were recorded during this simulation.', W / 2, H / 2, { align: 'center' });
+    } else {
+      // Table header
+      setFill(C.surface);
+      doc.roundedRect(MARGIN, y, COL, 9, 1.5, 1.5, 'F');
+      const cols = [
+        { label: 'TIME',     x: MARGIN + 3,  w: 16 },
+        { label: 'EVENT',    x: MARGIN + 22, w: 38 },
+        { label: 'SPEED',    x: MARGIN + 65, w: 22 },
+        { label: 'SCORE',    x: MARGIN + 92, w: 22 },
+        { label: 'JERK',     x: MARGIN + 118,w: 22 },
+        { label: 'LEAN',     x: MARGIN + 144,w: 22 },
+      ];
+      setFont(5.5, 'bold');
+      setTxt(C.text3);
+      cols.forEach(c => doc.text(c.label, c.x, y + 6));
+
+      // Header underline
+      setFill(C.surface2);
+      doc.rect(MARGIN, y + 9, COL, 0.4, 'F');
+      y += 12;
+
+      // Reversed so newest is at bottom (report reads chronologically)
+      const logRows = [...eventLogData].reverse();
+      const maxRows = 55; // fit on page
+      const toShow  = logRows.slice(0, maxRows);
+
+      toShow.forEach((ev, i) => {
+        const ry = y + i * 7.5;
+        if (ry > H - 20) return; // guard
+
+        // Alternating row bg
+        if (i % 2 === 0) {
+          setFill([19, 22, 30]);
+          doc.rect(MARGIN, ry - 4, COL, 7.5, 'F');
+        }
+
+        // Time
+        setFont(5.5, 'normal');
+        setTxt(C.text3);
+        doc.text(ev.time, cols[0].x, ry);
+
+        // Event pill
+        const evCol = eventColor(ev.type);
+        setFill(evCol.map(v => Math.round(v * 0.15 + 5)));
+        doc.roundedRect(cols[1].x - 1, ry - 4, 34, 5.5, 1, 1, 'F');
+        setFont(5.5, 'bold');
+        setTxt(evCol);
+        doc.text(ev.label.toUpperCase(), cols[1].x, ry);
+
+        // Numeric columns
+        setFont(5.5, 'normal');
+        const numCol = (v, thr1, thr2, max) => {
+          const pct = Math.abs(parseFloat(v)) / max;
+          return pct > thr1 ? C.red : pct > thr2 ? C.amber : C.text2;
+        };
+        setTxt(numCol(ev.speed, 0.75, 0.55, 120));
+        doc.text(`${ev.speed} km/h`, cols[2].x, ry);
+
+        setTxt(scoreColor(ev.score));
+        doc.text(`${ev.score}`, cols[3].x, ry);
+
+        setTxt(numCol(ev.jerk, 0.6, 0.35, 25));
+        doc.text(`${ev.jerk}`, cols[4].x, ry);
+
+        setTxt(numCol(ev.lean, 0.7, 0.45, 50));
+        doc.text(`${ev.lean}°`, cols[5].x, ry);
+
+        // Separator
+        setFill(C.surface2);
+        doc.rect(MARGIN, ry + 3, COL, 0.2, 'F');
+      });
+
+      if (logRows.length > maxRows) {
+        y = y + maxRows * 7.5 + 4;
+        setFont(6, 'normal');
+        setTxt(C.text3);
+        doc.text(`+ ${logRows.length - maxRows} more events not shown`, MARGIN, y);
+      }
+    }
+
+    // ── Recommendations block ──────────────────────────────────────────────
+    const recY = H - 70;
+    setFill(C.surface);
+    doc.roundedRect(MARGIN, recY, COL, 52, 2, 2, 'F');
+    setFill(C.green);
+    doc.roundedRect(MARGIN, recY, 3, 52, 1.5, 1.5, 'F');
+
+    setFont(8, 'bold');
+    setTxt(C.green);
+    doc.text('RECOMMENDATIONS', MARGIN + 7, recY + 9);
+
+    const recs = [];
+    if (eventCounts.brake > 3)  recs.push({ icon: '●', text: 'Reduce harsh braking — apply brakes progressively and maintain safe following distance.' });
+    if (eventCounts.accel > 3)  recs.push({ icon: '●', text: 'Avoid hard acceleration — smooth throttle control improves fuel efficiency and tyre life.' });
+    if (eventCounts.corner > 3) recs.push({ icon: '●', text: 'Reduce lean angle in corners — slow before the bend, not during it.' });
+    if (eventCounts.speed > 2)  recs.push({ icon: '●', text: `Observe the ${meta.speedLimit} km/h speed limit for this route type.` });
+    if (recs.length === 0)       recs.push({ icon: '●', text: 'Excellent performance! Maintain consistent riding habits to keep a high behavior score.' });
+    recs.push({ icon: '●', text: 'Use the RideIQ app regularly to track long-term trends and earn safety rewards.' });
+
+    recs.slice(0, 4).forEach((r, i) => {
+      setFont(6, 'bold');
+      setTxt(C.green);
+      doc.text(r.icon, MARGIN + 7, recY + 17 + i * 9);
+      setFont(6, 'normal');
+      setTxt(C.text2);
+      doc.text(r.text, MARGIN + 11, recY + 17 + i * 9, { maxWidth: COL - 14 });
+    });
+
+    // ── Footer page 2 ──────────────────────────────────────────────────────
+    setFill(C.surface);
+    doc.rect(0, H - 14, W, 14, 'F');
+    setFill(C.green);
+    doc.rect(0, H - 14, W, 0.5, 'F');
+    setFont(6, 'normal');
+    setTxt(C.text3);
+    doc.text('RideIQ · Two-Wheeler Driving Behavior Analytics · Varroc Eureka PS3', MARGIN, H - 5);
+    doc.text('Page 2 of 2', W - MARGIN, H - 5, { align: 'right' });
+
+    // ── Save ───────────────────────────────────────────────────────────────
+    const fname = `RideIQ_Report_${scenario}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.pdf`;
+    doc.save(fname);
+    showToast('✅', 'Report downloaded successfully!');
+  }, 80);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+drawRoad();
+drawWaves();
+</script>
+</body>
+</html>
